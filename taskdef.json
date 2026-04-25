@@ -1,0 +1,21 @@
+{
+  "family": "capstone-project2-task",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "capstone-project2-container",
+      "image": "<IMAGE_NAME>",
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true
+    }
+  ],
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::508471420037:role/ecsTaskExecutionRole"
+}
