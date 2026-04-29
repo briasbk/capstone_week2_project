@@ -1,676 +1,456 @@
-# AWS CI/CD Capstone Project
+# AWS CI/CD Capstone Project: End-to-End Production Pipeline
 
-> End-to-End CI/CD Pipeline using CodePipeline · CodeBuild · CodeDeploy · ECR · ECS (Fargate)
-
----
-
-## Table of Contents
-
-1. [Project Overview](#1-project-overview)
-2. [Architecture](#2-architecture)
-3. [Prerequisites](#3-prerequisites)
-4. [Repository Structure](#4-repository-structure)
-5. [Step 1 — Prepare the Application Code](#step-1--prepare-the-application-code)
-6. [Step 2 — Set Up Amazon ECR](#step-2--set-up-amazon-ecr)
-7. [Step 3 — Create ECS Cluster and Service](#step-3--create-ecs-cluster-and-service)
-8. [Step 4 — Configure AWS CodeBuild](#step-4--configure-aws-codebuild)
-9. [Step 5 — Configure AWS CodeDeploy](#step-5--configure-aws-codedeploy)
-10. [Step 6 — Create the CodePipeline](#step-6--create-the-codepipeline)
-11. [Step 7 — Add Monitoring & Alerts](#step-7--add-monitoring--alerts)
-12. [Configuration File Reference](#configuration-file-reference)
-13. [IAM Permissions Reference](#iam-permissions-reference)
-14. [Troubleshooting](#troubleshooting)
-15. [Rubric Checklist](#rubric-checklist)
+[![AWS](https://img.shields.io/badge/AWS-100%25-green)](https://aws.amazon.com)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-CodePipeline-blue)](https://aws.amazon.com/codepipeline/)
+[![Docker](https://img.shields.io/badge/Docker-Containerized-blue)](https://www.docker.com)
+[![ECS](https://img.shields.io/badge/ECS-Fargate-orange)](https://aws.amazon.com/ecs/)
 
 ---
 
-## 1. Project Overview
+## Project Overview
 
-This project demonstrates a **production-grade, fully automated CI/CD pipeline** on AWS. Every `git push` to the main branch triggers:
+This is a **production-grade, fully automated CI/CD pipeline** on AWS that demonstrates modern DevOps practices. The pipeline automatically takes code from GitHub, builds and tests it, packages it into a Docker container, and deploys it to Amazon ECS Fargate behind an Application Load Balancer with Blue/Green deployment strategy.
 
-1. **Source** — CodePipeline detects the change in GitHub.
-2. **Build** — CodeBuild installs dependencies, runs unit tests, builds a Docker image, and pushes it to ECR.
-3. **Approval** — A manual gate must be passed before promoting to production.
-4. **Deploy** — CodeDeploy performs a Blue/Green deployment to an ECS Fargate cluster behind an Application Load Balancer.
-5. **Monitor** — CloudWatch alarms and SNS email notifications track pipeline and service health.
+### Key Features
+
+- **Complete CI/CD Pipeline**: GitHub → CodeBuild → ECR → CodeDeploy → ECS
+- **Containerization**: Dockerized Node.js application
+- **Zero-Downtime Deployments**: Blue/Green deployment strategy
+- **Comprehensive Monitoring**: CloudWatch alarms with SNS notifications
+- **Manual Approval Gate**: Production deployment control
+- **Production-Ready**: Security headers, rate limiting, health checks
+- **Auto-scaling Ready**: ECS service with scaling policies
+- **Secure by Design**: IAM least privilege, non-root containers
+
+##  Table of Contents
+
+- [Project Overview](#project-overview)
+- [Architecture](#architecture)
+- [Repository Structure](#repository-structure)
+- [Prerequisites](#prerequisites)
+- [Step-by-Step Setup Guide](#step-by-step-setup-guide)
+  - [Step 1: Application & GitHub](#step-1-application--github)
+  - [Step 2: Set Up ECR](#step-2-set-up-ecr)
+  - [Step 3: ECS Cluster & Service](#step-3-ecs-cluster--service)
+  - [Step 4: Configure CodeBuild](#step-4-configure-codebuild)
+  - [Step 5: Configure CodeDeploy](#step-5-configure-codedeploy)
+  - [Step 6: Create CodePipeline](#step-6-create-codepipeline)
+  - [Step 7: Monitoring & Alerts](#step-7-monitoring--alerts)
+- [File Reference](#file-reference)
+- [Testing Locally](#testing-locally)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
-## 2. Architecture
+
+## Architecture
 
 ```
-┌──────────────┐     webhook      ┌─────────────────────────────────────────────────────────┐
-│   Developer  │ ──────────────▶  │                    AWS CodePipeline                     │
-│  git push    │                  │                                                         │
-└──────────────┘                  │  ┌──────────┐  ┌───────────┐  ┌──────────┐  ┌───────┐ │
-                                  │  │  Source  │─▶│   Build   │─▶│ Approval │─▶│Deploy │ │
-                                  │  │ (GitHub) │  │(CodeBuild)│  │ (Manual) │  │ (ECS) │ │
-                                  │  └──────────┘  └─────┬─────┘  └──────────┘  └───┬───┘ │
-                                  └────────────────────── │ ──────────────────────── │ ────┘
-                                                          │                          │
-                                                    ┌─────▼──────┐          ┌───────▼──────┐
-                                                    │ Amazon ECR │          │  ECS Fargate │
-                                                    │ (Docker    │          │  + ALB       │
-                                                    │  Registry) │          │  Blue/Green  │
-                                                    └────────────┘          └──────────────┘
-                                                                                    │
-                                                                         ┌──────────▼──────────┐
-                                                                         │ CloudWatch + SNS     │
-                                                                         │ (Alarms & Alerts)    │
-                                                                         └─────────────────────┘
+GitHub (push) 
+    │
+    ▼
+AWS CodePipeline
+    │
+    ├── Stage 1: SOURCE ──────── GitHub repository
+    │
+    ├── Stage 2: BUILD ───────── CodeBuild
+    │                               ├── Install dependencies
+    │                               ├── Run unit tests (Jest)
+    │                               ├── Build Docker image
+    │                               └── Push image → Amazon ECR
+    │
+    ├── Stage 3: APPROVAL ─────── Manual approval gate (SNS email)
+    │
+    ├── Stage 4: DEPLOY ──────── CodeDeploy (Blue/Green)
+    │                               └── Update ECS Task Definition
+    │                                   └── ECS Fargate Service
+    │                                          └── App Load Balancer
+    │
+    └── Monitoring: CloudWatch Alarms + SNS Notifications
+
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    MY ACTUAL CI/CD ARCHITECTURE                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   GitHub     │────▶│   Docker     │────▶│    ECR       │
+│   Repository │     │   Build      │     │  Repository  │
+│   (Source)   │     │  (Local/CLI) │     │  (Image Store)│
+└──────────────┘     └──────────────┘     └──────────────┘
+                             │                    │
+                             │                    │
+                             ▼                    ▼
+                      ┌─────────────────────────────────┐
+                      │         AWS ECS Fargate          │
+                      │                                  │
+                      │  ┌─────────────────────────────┐ │
+                      │  │    capstone-service         │ │
+                      │  │  ┌─────────┐ ┌─────────┐   │ │
+                      │  │  │ Task 1  │ │ Task 2  │   │ │
+                      │  │  │Port 3000│ │Port 3000│   │ │
+                      │  │  └────┬────┘ └────┬────┘   │ │
+                      │  └───────┼───────────┼─────────┘ │
+                      │          │           │           │
+                      └──────────┼───────────┼───────────┘
+                                 │           │
+                                 ▼           ▼
+                      ┌─────────────────────────────────┐
+                      │    Application Load Balancer    │
+                      │         capstone-alb            │
+                      │                                  │
+                      │  Blue Target Group  (capstone-tg)│
+                      │  Green Target Group (capstone-tg-green)│
+                      └─────────────────────────────────┘
+                                      │
+                                      ▼
+                              ┌─────────────┐
+                              │   Users     │
+                              │  (Browser)  │
+                              └─────────────┘
 ```
 
 ---
 
-## 3. Prerequisites
-
-Before you begin, make sure you have the following in place.
-
-| Requirement | Details |
-|---|---|
-| AWS Account | With admin or sufficiently scoped IAM permissions |
-| AWS CLI | Installed and configured (`aws configure`) |
-| Docker | Installed locally for optional local testing |
-| GitHub Account | Repository created and ready |
-| Node.js ≥ 16 | For local development and testing |
-| Git | Installed locally |
-
-> **Tip:** Run `aws sts get-caller-identity` to confirm your CLI credentials are working before starting.
-
----
-
-## 4. Repository Structure
+## Repository Structure
 
 ```
-capstone-project2/
+myapp/
 ├── src/
-│   ├── app.js              # Express.js application entry point
-│   ├── package.json        # Node.js dependencies and scripts
-│   └── package-lock.json   # Locked dependency versions
+│   ├── app.js              # Express.js application
+│   ├── package.json        # Node.js dependencies
+│   └── package-lock.json   # Locked dependency
 ├── tests/
 │   └── app.test.js         # Jest unit tests
-├── Dockerfile              # Container build instructions
-├── buildspec.yml           # CodeBuild build instructions
-├── appspec.yml             # CodeDeploy deployment instructions
+    └── health.test.js      # health unit tests
+├── Dockerfile              # Multi-stage Docker build
+├── buildspec.yml           # CodeBuild instructions
+├── appspec.yml             # CodeDeploy ECS deployment spec
 ├── taskdef.json            # ECS Task Definition template
+├── pipeline-diagram.png    # Architecture diagram
 └── README.md               # This file
 ```
 
 ---
 
-## Step 1 — Prepare the Application Code
+## Prerequisites
 
-### 1.1 Create the project directory
+| Requirement | Details |
+|---|---|
+| AWS Account | With permissions for CodePipeline, CodeBuild, CodeDeploy, ECS, ECR, IAM, CloudWatch |
+| GitHub Account | Repository with your code |
+| AWS CLI | Installed and configured (`aws configure`) |
+| Docker | Installed locally for testing |
+| Node.js 18+ | For local development |
 
-```bash
-mkdir capstone-project2 && cd capstone-project2
-mkdir src tests
-```
+---
 
-### 1.2 Create the application — `src/app.js`
+## Step-by-Step Setup Guide
 
-```javascript
-const express = require('express');
-const app = express();
-const port = 3000;
+### Step 1: Application & GitHub
 
-app.get('/', (req, res) => {
-  res.send('Hello from AWS CI/CD Capstone Project!');
-});
-
-app.listen(port, () => {
-  console.log(`App running on port ${port}`);
-});
-```
-
-### 1.3 Create `src/package.json`
-
-```json
-{
-  "name": "capstone-project2",
-  "version": "1.0.0",
-  "main": "app.js",
-  "dependencies": {
-    "express": "^4.18.2"
-  },
-  "scripts": {
-    "start": "node app.js",
-    "test": "jest"
-  },
-  "devDependencies": {
-    "jest": "^29.6.1"
-  }
-}
-```
-
-### 1.4 Create `tests/app.test.js`
-
-```javascript
-test('sample arithmetic test', () => {
-  expect(2 + 2).toBe(4);
-});
-```
-
-### 1.5 Create the `Dockerfile`
-
-```dockerfile
-FROM node:16
-
-WORKDIR /usr/src/app
-COPY package*.json ./
-RUN npm install
-
-COPY . .
-EXPOSE 3000
-CMD ["npm", "start"]
-```
-
-### 1.6 Test locally (optional but recommended)
+1. Fork or clone this repository to your GitHub account.
+2. Ensure your repo is **public** or that you have set up a GitHub connection in AWS.
+3. Verify the app runs locally:
 
 ```bash
 cd src
 npm install
-npm test          # Run unit tests
-npm start         # Verify app starts on port 3000
-
-# Optional Docker test
-docker build -t capstone-project2:local .
-docker run -p 3000:3000 capstone-project2:local
-# Visit http://localhost:3000
-```
-
-### 1.7 Push to GitHub
-
-```bash
-git init
-git add .
-git commit -m "Initial commit: Add app, Dockerfile, and tests"
-git remote add origin https://github.com/<your-username>/capstone-project2.git
-git push -u origin main
+npm test        
+npm start       
 ```
 
 ---
 
-## Step 2 — Set Up Amazon ECR
+### Step 2: Set Up ECR
 
-Amazon ECR is the Docker registry where CodeBuild will push your images.
-
-### 2.1 Create the ECR repository
+Create the ECR repository where Docker images will be stored:
 
 ```bash
-aws ecr create-repository --repository-name capstone-project2-repo --region us-east-1
+aws ecr create-repository \
+  --repository-name myapp-repo \
+  --region us-east-1
 ```
 
+Note the **repository URI** returned — you'll need it in later steps.  
+Format: `<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/myapp-repo`
 
---->To Remove
-URI: 508471420037.dkr.ecr.us-east-1.amazonaws.com/capstone-project2-repo
+---
 
+### Step 3: ECS Cluster & Service
 
-Note the `repositoryUri` from the output — it follows this pattern:
+#### 3a. Create ECS Cluster
 
 ```
-<account_id>.dkr.ecr.<region>.amazonaws.com/capstone-project2-repo
+AWS Console → ECS → Clusters → Create Cluster
+  Name:              myapp-cluster
+  Infrastructure:    AWS Fargate (serverless)
 ```
 
-### 2.2 Verify the repository exists
+#### 3b. Create Application Load Balancer
+
+```
+EC2 Console → Load Balancers → Create → Application Load Balancer
+  Name:          myapp-alb
+  Scheme:        Internet-facing
+  Listeners:     HTTP port 80
+  Target Group:  myapp-tg-blue  (port 3000, HTTP, /health)
+```
+
+Also create a second target group `myapp-tg-green` for Blue/Green.
+
+#### 3c. Register the Task Definition
+
+Update `taskdef.json` with your `<ACCOUNT_ID>`, then register:
 
 ```bash
-aws ecr describe-repositories --repository-names capstone-project2-repo
+aws ecs register-task-definition \
+  --cli-input-json file://taskdef.json \
+  --region us-east-1
 ```
 
-### 2.3 (Optional) Test pushing an image locally
+#### 3d. Create ECS Service
 
-```bash
-# Authenticate Docker with ECR
-aws ecr get-login-password --region us-east-1 | \
-  docker login --username AWS --password-stdin \
-  <account_id>.dkr.ecr.us-east-1.amazonaws.com
-
-# Tag and push
-docker build -t capstone-project2-repo .
-docker tag capstone-project2-repo:latest \
-  <account_id>.dkr.ecr.us-east-1.amazonaws.com/capstone-project2-repo:latest
-docker push \
-  <account_id>.dkr.ecr.us-east-1.amazonaws.com/capstone-project2-repo:latest
+```
+ECS Console → myapp-cluster → Create Service
+  Launch type:       Fargate
+  Task definition:   myapp-task
+  Service name:      myapp-service
+  Desired count:     1
+  Load balancer:     myapp-alb
+  Deployment type:   Blue/Green (CodeDeploy)
 ```
 
 ---
 
-## Step 3 — Create ECS Cluster and Service
+### Step 4: Configure CodeBuild
 
-### 3.1 Create the ECS cluster (Fargate)
-
-In the AWS Console:
-
-1. Go to **ECS → Clusters → Create Cluster**.
-2. Choose **AWS Fargate (serverless)**.
-3. Name it `capstone-project2-cluster`.
-4. Click **Create**.
-
-Or via CLI:
+#### 4a. Store account ID in Parameter Store
 
 ```bash
-aws ecs create-cluster --cluster-name capstone-project2-cluster
+aws ssm put-parameter \
+  --name "/myapp/account_id" \
+  --value "<YOUR_ACCOUNT_ID>" \
+  --type "String"
 ```
 
-### 3.2 Create the Application Load Balancer
+#### 4b. Create CodeBuild Project
 
-1. Go to **EC2 → Load Balancers → Create Load Balancer**.
-2. Choose **Application Load Balancer**.
-3. Name: `capstone-project2-alb`.
-4. Scheme: **Internet-facing**.
-5. Listeners: Port **80** (HTTP).
-6. Add at least 2 public subnets.
-7. Create a security group allowing inbound HTTP (port 80) from `0.0.0.0/0`.
-8. Create a **Target Group**:
-   - Target type: **IP**
-   - Protocol: **HTTP**, Port: **3000**
-   - Health check path: `/`
-9. Register no targets yet — ECS will manage this.
+```
+CodeBuild Console → Create build project
+  Project name:       myapp-build
+  Source:             GitHub → your repository
+  Environment:        Managed image → Ubuntu → Standard → aws/codebuild/standard:7.0
+  Privileged:         YES (required for Docker builds)
+  Service role:       Create new or use existing
+  Buildspec:          Use buildspec.yml in repo
+```
 
-### 3.3 Create the ECS Task Definition
+#### 4c. IAM Permissions for CodeBuild Role
 
-1. Go to **ECS → Task Definitions → Create new Task Definition**.
-2. Choose **Fargate**.
-3. Configure:
-   - Family name: `capstone-project2-task`
-   - Task role: `ecsTaskExecutionRole`
-   - Network mode: `awsvpc`
-   - CPU: `0.25 vCPU (256)`
-   - Memory: `0.5 GB (512)`
-4. Add container:
-   - Name: `capstone-project2-container`
-   - Image: `<account_id>.dkr.ecr.us-east-1.amazonaws.com/capstone-project2-repo:latest`
-   - Port mappings: `3000 / TCP`
-5. Click **Create**.
-
-### 3.4 Create the ECS Service
-
-1. Go to your cluster → **Services → Create**.
-2. Launch type: **Fargate**.
-3. Task Definition: `capstone-project2-task` (latest revision).
-4. Service name: `capstone-project2-service`.
-5. Number of tasks: `1`.
-6. VPC: select your VPC, at least 2 subnets.
-7. Load balancer: select `capstone-project2-alb`, listener port 80, target group created above.
-8. Deployment type: **Blue/green deployment (powered by AWS CodeDeploy)**.  
-   _(This creates a CodeDeploy application automatically.)_
-9. Click **Create Service**.
+Attach these policies to the CodeBuild service role:
+- `AmazonECR_FullAccess`
+- `AmazonSSMReadOnlyAccess`
+- `CloudWatchLogsFullAccess`
 
 ---
 
-## Step 4 — Configure AWS CodeBuild
+### Step 5: Configure CodeDeploy
 
-### 4.1 Create `buildspec.yml` in project root
+#### 5a. Create CodeDeploy Application
 
-```yaml
-version: 0.2
-
-phases:
-  pre_build:
-    commands:
-      - echo Logging in to Amazon ECR...
-      - aws --version
-      - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
-      - REPOSITORY_URI=<account_id>.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/capstone-project2-repo
-      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-
-  build:
-    commands:
-      - echo Build started on `date`
-      - cd src
-      - npm install
-      - npm test
-      - cd ..
-      - echo Building the Docker image...
-      - docker build -t $REPOSITORY_URI:$IMAGE_TAG .
-
-  post_build:
-    commands:
-      - echo Build completed on `date`
-      - echo Pushing the Docker image...
-      - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo Writing image definitions file...
-      - printf '[{"name":"capstone-project2-container","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
-
-artifacts:
-  files: imagedefinitions.json
+```
+CodeDeploy Console → Applications → Create
+  Application name:    myapp-deploy
+  Compute platform:    Amazon ECS
 ```
 
-> **Replace** `<account_id>` with your actual AWS account ID.
+#### 5b. Create Deployment Group
 
-### 4.2 Create the CodeBuild project in AWS Console
-
-1. Go to **CodeBuild → Build Projects → Create build project**.
-2. Project name: `capstone-project2-build`.
-3. Source: **GitHub** → Connect your account → Select your repository.
-4. Environment:
-   - Managed image: **Ubuntu**
-   - Runtime: **Standard**
-   - Image: `aws/codebuild/standard:7.0`
-   - Privileged: **✅ Enable** (required for Docker builds)
-5. Service role: Create a new role (or attach an existing one with ECR push permissions).
-6. Buildspec: **Use a buildspec file** → leave path as `buildspec.yml`.
-7. Artifacts: **No artifacts** (CodePipeline manages artifact passing).
-8. Click **Create build project**.
-
-### 4.3 Grant CodeBuild permissions to push to ECR
-
-Attach this inline policy to the CodeBuild IAM role:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "ecr:GetAuthorizationToken",
-        "ecr:BatchCheckLayerAvailability",
-        "ecr:InitiateLayerUpload",
-        "ecr:UploadLayerPart",
-        "ecr:CompleteLayerUpload",
-        "ecr:PutImage"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
+```
+  Deployment group name:   myapp-dg
+  Service role:            AWSCodeDeployRoleForECS
+  ECS cluster:             myapp-cluster
+  ECS service:             myapp-service
+  Load balancer:           myapp-alb
+  Target groups:           myapp-tg-blue / myapp-tg-green
+  Deployment config:       CodeDeployDefault.ECSAllAtOnce
+  Deployment type:         Blue/Green
 ```
 
 ---
 
-## Step 5 — Configure AWS CodeDeploy
+### Step 6: Create CodePipeline
 
-### 5.1 Create `appspec.yml` in project root
-
-```yaml
-version: 0.0
-Resources:
-  - TargetService:
-      Type: AWS::ECS::Service
-      Properties:
-        TaskDefinition: "<TASK_DEFINITION>"
-        LoadBalancerInfo:
-          ContainerName: "capstone-project2-container"
-          ContainerPort: 3000
+```
+CodePipeline Console → Create Pipeline
+  Pipeline name:    myapp-pipeline
+  Role:             Create new service role
 ```
 
-> CodePipeline replaces `<TASK_DEFINITION>` automatically at deploy time.
+**Add stages:**
 
-### 5.2 Create `taskdef.json` in project root
+| Stage | Provider | Config |
+|---|---|---|
+| Source | GitHub (v2) | Repo: `myapp`, Branch: `main` |
+| Build | CodeBuild | Project: `myapp-build` |
+| Approval | Manual Approval | SNS topic: `myapp-approvals` (email) |
+| Deploy | CodeDeploy | App: `myapp-deploy`, Group: `myapp-dg` |
 
-```json
-{
-  "family": "capstone-project2-task",
-  "networkMode": "awsvpc",
-  "containerDefinitions": [
-    {
-      "name": "capstone-project2-container",
-      "image": "<IMAGE_NAME>",
-      "portMappings": [
-        {
-          "containerPort": 3000,
-          "protocol": "tcp"
-        }
-      ],
-      "essential": true
-    }
-  ],
-  "requiresCompatibilities": ["FARGATE"],
-  "cpu": "256",
-  "memory": "512",
-  "executionRoleArn": "arn:aws:iam::<account_id>:role/ecsTaskExecutionRole"
-}
-```
+---
 
-> The `<IMAGE_NAME>` placeholder is replaced by CodePipeline during the deploy stage using the `imagedefinitions.json` artifact.
+### Step 7: Monitoring & Alerts
 
-### 5.3 Verify CodeDeploy application exists
-
-When you created the ECS service with Blue/Green deployment in Step 3.4, AWS automatically created a CodeDeploy application. Verify:
+#### 7a. Create SNS Topic
 
 ```bash
-aws deploy list-applications
-# Should list: AppECS-capstone-project2-cluster-capstone-project2-service
-```
-
-If it was not created, create it manually:
-
-1. Go to **CodeDeploy → Applications → Create application**.
-2. Application name: `capstone-project2-codedeploy`.
-3. Compute platform: **Amazon ECS**.
-4. Create a deployment group pointing to your ECS cluster and service.
-
----
-
-## Step 6 — Create the CodePipeline
-
-### 6.1 Open CodePipeline
-
-Go to **AWS CodePipeline → Pipelines → Create pipeline**.
-
-### 6.2 Pipeline settings
-
-- Pipeline name: `capstone-project2-pipeline`
-- Service role: Create a new role
-- Artifact store: Default S3 bucket (auto-created)
-
-### 6.3 Stage 1 — Source
-
-- Source provider: **GitHub (Version 2)**
-- Connect to GitHub: follow the OAuth connection wizard
-- Repository: your `capstone-project2` repository
-- Branch: `main`
-- Detection option: **GitHub webhooks**
-
-### 6.4 Stage 2 — Build
-
-- Build provider: **AWS CodeBuild**
-- Region: your region
-- Project name: `capstone-project2-build`
-- Build type: **Single build**
-
-### 6.5 Stage 3 — Approval (Manual Gate)
-
-- Click **Add stage** → name it `Approval`
-- Add action: **Manual approval**
-- Action name: `ManualApproval`
-- SNS topic ARN: (optional — enter the SNS topic created in Step 7 for email notification)
-- Comments: `Please review the build artifacts before deploying to production.`
-
-### 6.6 Stage 4 — Deploy
-
-- Deploy provider: **Amazon ECS (Blue/Green)**
-- Region: your region
-- Application name: `AppECS-capstone-project2-cluster-capstone-project2-service`
-- Deployment group: the group attached to `capstone-project2-service`
-- Amazon ECS task definition: **BuildArtifact** → `taskdef.json`
-- AWS CodeDeploy AppSpec file: **BuildArtifact** → `appspec.yml`
-- Dynamically update task definition image:
-  - Input artifact: `BuildArtifact`
-  - Placeholder text in task definition: `<IMAGE_NAME>`
-
-### 6.7 Review and create
-
-Click **Create pipeline**. CodePipeline will run immediately for the first time.
-
----
-
-## Step 7 — Add Monitoring & Alerts
-
-### 7.1 Create an SNS topic for notifications
-
-```bash
-aws sns create-topic --name capstone-project2-alerts
+aws sns create-topic --name myapp-alerts
 aws sns subscribe \
-  --topic-arn arn:aws:sns:us-east-1:<account_id>:capstone-project2-alerts \
+  --topic-arn arn:aws:sns:us-east-1:<ACCOUNT_ID>:myapp-alerts \
   --protocol email \
-  --notification-endpoint your-email@example.com
+  --notification-endpoint your@email.com
 ```
 
-Check your inbox and confirm the subscription.
+Confirm the subscription from your email inbox.
 
-### 7.2 Create a CloudWatch alarm for ECS service health
+#### 7b. Create CloudWatch Alarm — ECS CPU
 
-Monitor running task count — alarm if it drops below 1:
-
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name "capstone-project2-ECS-NoRunningTasks" \
-  --alarm-description "Alert when ECS running task count drops to 0" \
-  --metric-name RunningTaskCount \
-  --namespace AWS/ECS \
-  --dimensions Name=ClusterName,Value=capstone-project2-cluster Name=ServiceName,Value=capstone-project2-service \
-  --statistic Average \
-  --period 60 \
-  --evaluation-periods 1 \
-  --threshold 1 \
-  --comparison-operator LessThanThreshold \
-  --alarm-actions arn:aws:sns:us-east-1:<account_id>:capstone-project2-alerts \
-  --treat-missing-data breaching
+```
+CloudWatch Console → Alarms → Create Alarm
+  Metric:        ECS → ClusterName/ServiceName → CPUUtilization
+  Threshold:     > 80% for 2 consecutive periods
+  Period:        5 minutes
+  Action:        Send notification to myapp-alerts (SNS)
 ```
 
-### 7.3 Create a CloudWatch alarm for CodePipeline failures
+#### 7c. Create CloudWatch Alarm — Pipeline Failures
 
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name "capstone-project2-Pipeline-Failed" \
-  --alarm-description "Alert when CodePipeline execution fails" \
-  --metric-name FailedPipelineExecutions \
-  --namespace AWS/CodePipeline \
-  --dimensions Name=PipelineName,Value=capstone-project2-pipeline \
-  --statistic Sum \
-  --period 60 \
-  --evaluation-periods 1 \
-  --threshold 1 \
-  --comparison-operator GreaterThanOrEqualToThreshold \
-  --alarm-actions arn:aws:sns:us-east-1:<account_id>:capstone-project2-alerts \
-  --treat-missing-data notBreaching
 ```
-
-### 7.4 Verify monitoring in the console
-
-- Go to **CloudWatch → Alarms** and confirm both alarms appear in OK state.
-- Go to **SNS → Topics → capstone-project2-alerts → Subscriptions** and confirm your email is `Confirmed`.
+  Metric:        CodePipeline → ExecutionsFailed
+  Threshold:     >= 1
+  Period:        5 minutes
+  Action:        Send notification to myapp-alerts (SNS)
+```
 
 ---
 
-## Configuration File Reference
+## File Reference
 
-### buildspec.yml — Full breakdown
-
-| Phase | Purpose |
+| File | Purpose |
 |---|---|
-| `pre_build` | Authenticates Docker with ECR, sets image URI and tag variables |
-| `build` | Installs npm deps, runs Jest tests, builds Docker image |
-| `post_build` | Pushes image to ECR, writes `imagedefinitions.json` for CodePipeline |
-| `artifacts` | Exports `imagedefinitions.json` to pass to the Deploy stage |
-
-### appspec.yml — Full breakdown
-
-| Field | Purpose |
-|---|---|
-| `TaskDefinition` | Placeholder replaced by CodePipeline with the new task definition ARN |
-| `ContainerName` | Must exactly match the container name in `taskdef.json` |
-| `ContainerPort` | Must match the port your app listens on |
-
-### taskdef.json — Placeholders to replace
-
-| Placeholder | Replace with |
-|---|---|
-| `<IMAGE_NAME>` | Your ECR image URI (managed dynamically by CodePipeline) |
-| `<account_id>` | Your 12-digit AWS account ID |
+| `src/app.js` | Express.js web application with `/` and `/health` routes |
+| `src/package.json` | Node.js dependencies (Express, Jest, Supertest) |
+| `tests/app.test.js` | Unit tests using Jest + Supertest |
+| `Dockerfile` | Multi-stage Docker build (test → production) |
+| `buildspec.yml` | CodeBuild: login to ECR, run tests, build & push image |
+| `appspec.yml` | CodeDeploy: Blue/Green ECS deployment specification |
+| `taskdef.json` | ECS Task Definition template (Fargate, port 3000) |
 
 ---
 
-## IAM Permissions Reference
+## Testing Locally
 
-| Role | Required Permissions |
-|---|---|
-| CodeBuild service role | ECR push, S3 read/write, CloudWatch Logs |
-| CodeDeploy service role | ECS full access, ELB access, S3 read |
-| CodePipeline service role | CodeBuild, CodeDeploy, S3, SNS, ECS |
-| ECS Task Execution role | ECR pull, CloudWatch Logs write |
+```bash
+# Install dependencies
+cd src && npm install
 
-> All roles are created automatically if you let the console wizard create them. Review and tighten permissions before production use.
+# Run tests
+npm test
+
+# Build Docker image locally
+cd ..
+docker build -t myapp:local .
+
+# Run container locally
+docker run -p 3000:3000 myapp:local
+
+# Test endpoints
+curl http://localhost:3000/          # Main page
+curl http://localhost:3000/health    # Health check → {"status":"healthy"}
+```
 
 ---
 
 ## Troubleshooting
 
-| Problem | Likely Cause | Fix |
-|---|---|---|
-| CodeBuild fails: `Cannot connect to Docker daemon` | Privileged mode not enabled | Edit build project → enable **Privileged** flag |
-| CodeBuild fails: `authorization token has expired` | Old ECR login command | Use `aws ecr get-login-password` (not `get-login`) in pre_build |
-| CodeDeploy fails: `The deployment group does not exist` | ECS service not set to Blue/Green | Recreate service with Blue/Green deployment type |
-| Pipeline stuck at Approval | No approver action taken | Go to Pipeline → click **Review** on the Approval stage |
-| ECS tasks keep stopping | App crashes on startup | Check ECS task logs in CloudWatch → `/ecs/capstone-project2-task` |
-| ALB returns 502 Bad Gateway | Container not listening on port 3000 | Confirm `EXPOSE 3000` in Dockerfile and app binds to `0.0.0.0` |
-| ECR push denied | CodeBuild role missing ECR permissions | Attach ECR push policy to the CodeBuild IAM role |
+| Issue | Solution |
+|---|---|
+| CodeBuild: `docker: Cannot connect to Docker daemon` | Enable **Privileged mode** in CodeBuild environment settings |
+| ECR push fails | Ensure CodeBuild IAM role has `ecr:GetAuthorizationToken` and `ecr:InitiateLayerUpload` |
+| ECS tasks not starting | Check CloudWatch Logs under `/ecs/myapp-task` for container errors |
+| ALB health checks failing | Ensure security group allows port 3000 inbound from ALB |
+| CodeDeploy stuck | Verify `appspec.yml` container name matches `taskdef.json` exactly |
+| Pipeline not triggering | Check GitHub connection is authorized in AWS Developer Tools |
 
 ---
+Deployed on Amazon ECS Fargate with full Blue/Green CI/CD automation.
 
-## Rubric Checklist
+### Live Application Access
 
-Use this checklist to verify your submission meets all rubric criteria before submitting.
+- Root: http://capstone-alb-2089285546.us-east-1.elb.amazonaws.com/
+- Health: http://capstone-alb-2089285546.us-east-1.elb.amazonaws.com/health
+- API Info: http://capstone-alb-2089285546.us-east-1.elb.amazonaws.com/api/info
+- Demo: http://capstone-alb-2089285546.us-east-1.elb.amazonaws.com/demo
 
-### Application, Repository & Containerization (25 pts)
+## Deployment Screenshots
 
-- [ ] `src/app.js` — Express app returning a response on `/`
-- [ ] `src/package.json` — dependencies and test script defined
-- [ ] `tests/app.test.js` — at least one passing Jest test
-- [ ] `Dockerfile` — app builds and runs in a container
-- [ ] `README.md` — this file, complete and clear
+### Project Structure & Local Testing
 
-### CI/CD Pipeline Implementation (25 pts)
+![Project Structure](images/project-structure.png)
+*Figure 1: Local project structure showing all directories and files*
 
-- [ ] `buildspec.yml` — installs, tests, builds Docker image, pushes to ECR
-- [ ] `imagedefinitions.json` — generated and exported as artifact
-- [ ] CodeBuild project — runs tests before building image
-- [ ] CodePipeline — Source → Build stages connected and passing
-- [ ] ECR repository — images visible after successful build
+![Health Endpoint Test](images/health-Endpoint-Test.png)
+*Figure 2: Local testing of health endpoint showing successful response*
 
-### Deployment & Infrastructure (30 pts)
+![Root Endpoint Test](images/Root-Endpoint-Test.png)
+*Figure 3: Local testing of root endpoint showing welcome message*
 
-- [ ] ECS cluster (`capstone-project2-cluster`) created with Fargate
-- [ ] ECS service (`capstone-project2-service`) running at least 1 task
-- [ ] Application Load Balancer serving traffic on port 80
-- [ ] `appspec.yml` and `taskdef.json` present and correctly configured
-- [ ] CodeDeploy Blue/Green deployment configured
-- [ ] Pipeline Deploy stage triggers ECS rolling Blue/Green update
-- [ ] App accessible via ALB DNS name in browser
+![Demo Page](images/demopage.png)
+*Figure 4: Local demo page displaying deployment information*
 
-### Monitoring, Governance & Documentation (20 pts)
+### AWS Infrastructure Setup
 
-- [ ] CloudWatch alarm for ECS task count
-- [ ] CloudWatch alarm for pipeline failures
-- [ ] SNS topic with confirmed email subscription
-- [ ] Manual Approval stage present in CodePipeline before Deploy
-- [ ] `pipeline-diagram.png` added to repository root
-- [ ] README covers all setup steps clearly
+![Load Balancer Active](images/loadbalance-active.png)
+*Figure 5: Application Load Balancer (capstone-alb) successfully created and active*
 
----
+![Target Group Created](images/target-group-created.png)
+*Figure 6: Target group (capstone-tg) configured for ECS Fargate tasks*
 
-## Quick Reference — Key AWS Resources
+![Deployment Completed](images/deployment-completed.png)
+*Figure 7: ECS Service showing 2 running tasks with steady state*
 
-After completing setup, record your resource identifiers here:
+### Application Endpoints - AWS Deployment
 
-```
-ECR Repository URI : <account_id>.dkr.ecr.<region>.amazonaws.com/capstone-project2-repo
-ECS Cluster Name   : capstone-project2-cluster
-ECS Service Name   : capstone-project2-service
-ALB DNS Name       : capstone-project2-alb-<id>.<region>.elb.amazonaws.com
-CodePipeline Name  : capstone-project2-pipeline
-SNS Topic ARN      : arn:aws:sns:<region>:<account_id>:capstone-project2-alerts
-```
+![Root Endpoint](images/root_endpoint.png)
+*Figure 8: Root endpoint returning welcome message with pipeline information*
 
-Visit the ALB DNS name in your browser — you should see:
+![Health Endpoint](images/health_endpoint.png)
+*Figure 9: Health check endpoint showing application status with version 2.0.0*
 
-```
-Hello from AWS CI/CD Capstone Project!
-```
+![API Info Endpoint](images/API_info_endpoint.png)
+*Figure 10: API information endpoint displaying application metadata and architecture*
 
----
+![Demo Page Deployment](images/Demo_page_deployment.png)
+*Figure 11: HTML demo page showing successful deployment on ECS Fargate*
 
-*Built for the AWS CI/CD Capstone Project. Every `git push` to `main` automatically builds, tests, and deploys your application.*
+### AWS CLI Verification
+
+![CLI Root and Health Endpoints](images/AWS-cli-root-health-endpoints.png)
+*Figure 12: AWS CLI showing successful API responses for root and health endpoints*
+
+![CLI Demo Page](images/AWS-cli-Demo-Page-endpoint.png)
+*Figure 13: AWS CLI displaying demo page HTML output*
+
+### Monitoring and Alerts Verification
+
+![CLI Verification Report](images/verification-cli-report.png)
+*Figure 14: Complete CLI verification showing ECS service, load balancer, ECR image, CloudWatch alarms, and SNS topic*
+
+![CloudWatch Dashboard](images/dashboard.png)
+*Figure 15: CloudWatch monitoring dashboard displaying ECS service health metrics, load balancer performance, and task health*
+
+![SNS Subscription Confirmation](images/email-sns.png)
+*Figure 16: SNS subscription confirmation email received and confirmed for monitoring alerts*
+
+![SNS Test Notification](images/AWS-Notification-Test-Notification.png)
+*Figure 17: Test notification from CloudWatch alarms demonstrating working alert system*

@@ -1,21 +1,47 @@
 {
-  "family": "capstone-project2-task",
+  "family": "capstone-app-task",
   "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::508471420037:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::508471420037:role/ecsTaskExecutionRole",
   "containerDefinitions": [
     {
-      "name": "capstone-project2-container",
-      "image": "<IMAGE_NAME>",
+      "name": "capstone-container",
+      "image": "508471420037.dkr.ecr.us-east-1.amazonaws.com/capstone-app-repo:latest",
+      "essential": true,
       "portMappings": [
         {
           "containerPort": 3000,
           "protocol": "tcp"
         }
       ],
-      "essential": true
+      "environment": [
+        {
+          "name": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "name": "APP_VERSION",
+          "value": "2.0.0"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/capstone-app",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
     }
-  ],
-  "requiresCompatibilities": ["FARGATE"],
-  "cpu": "256",
-  "memory": "512",
-  "executionRoleArn": "arn:aws:iam::508471420037:role/ecsTaskExecutionRole"
+  ]
 }

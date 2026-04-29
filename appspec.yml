@@ -3,7 +3,7 @@ Resources:
   - TargetService:
       Type: AWS::ECS::Service
       Properties:
-        TaskDefinition: "<TASK_DEFINITION>"
+        TaskDefinition: "capstone-app-task"
         LoadBalancerInfo:
-          ContainerName: "capstone-project2-container"
+          ContainerName: "capstone-container"
           ContainerPort: 3000
