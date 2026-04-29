@@ -9,7 +9,7 @@
   "containerDefinitions": [
     {
       "name": "capstone-container",
-      "image": "508471420037.dkr.ecr.us-east-1.amazonaws.com/capstone-project2-repo:latest",
+      "image": "<IMAGE_NAME>",
       "essential": true,
       "portMappings": [
         {
