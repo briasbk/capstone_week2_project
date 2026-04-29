@@ -28,4 +28,7 @@ phases:
       - printf '[{"name":"capstone-container","imageUri":"%s"}]' $REPOSITORY_URI:latest > imagedefinitions.json
 
 artifacts:
-  files: imagedefinitions.json
+  files:
+    - imagedefinitions.json
+    - taskdef.json
+    - appspec.yml
