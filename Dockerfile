@@ -1,4 +1,3 @@
-cat > Dockerfile << 'EOF'
 FROM node:18-alpine
 
 WORKDIR /app
@@ -21,4 +20,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Start the application
 CMD ["node", "src/app.js"]
-EOF
