@@ -18,7 +18,6 @@ This project sets up a fully automated CI/CD pipeline on AWS. Every time code is
 12. [Testing the Application](#testing-the-application)
 13. [Configuration File Reference](#configuration-file-reference)
 14. [Troubleshooting](#troubleshooting)
-15. [Rubric Checklist](#rubric-checklist)
 
 ---
 
