@@ -297,7 +297,7 @@ Subnets:          Select at least 2 public subnets
 Security group:   capstone-ecs-sg
 Load balancer:    capstone-alb
 Target group:     capstone-tg (Blue)
-Deployment type:  Blue/Green deployment (powered by AWS CodeDeploy)
+Deployment type:  Blue/Green deployment
 ```
 
 > Creating the service with Blue/Green automatically creates a CodeDeploy application and deployment group. Note the CodeDeploy application name from the ECS service page.
@@ -725,4 +725,23 @@ aws sns list-subscriptions-by-topic \
 
 ---
 
-*Every `git push` to `main` automatically builds, tests, and deploys the application through the full CI/CD pipeline.*
+*Every `git push` to `main` automatically builds, tests, and deploys the application through the full CI/CD pipeline.*ce identifiers here:
+
+```
+ECR Repository URI : <account_id>.dkr.ecr.<region>.amazonaws.com/capstone-project2-repo
+ECS Cluster Name   : capstone-project2-cluster
+ECS Service Name   : capstone-project2-service
+ALB DNS Name       : capstone-project2-alb-<id>.<region>.elb.amazonaws.com
+CodePipeline Name  : capstone-project2-pipeline
+SNS Topic ARN      : arn:aws:sns:<region>:<account_id>:capstone-project2-alerts
+```
+
+Visit the ALB DNS name in your browser — you should see:
+
+```
+Hello from AWS CI/CD Capstone Project!
+```
+
+---
+
+*Built for the AWS CI/CD Capstone Project. Every `git push` to `main` automatically builds, tests, and deploys your application.*
