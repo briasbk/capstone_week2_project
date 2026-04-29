@@ -26,9 +26,11 @@ phases:
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - printf '[{"name":"capstone-container","imageUri":"%s"}]' $REPOSITORY_URI:latest > imagedefinitions.json
+      - printf '{"ImageURI":"%s"}' $REPOSITORY_URI:latest > imageDetail.json
 
 artifacts:
   files:
     - imagedefinitions.json
+    - imageDetail.json
     - taskdef.json
     - appspec.yml
