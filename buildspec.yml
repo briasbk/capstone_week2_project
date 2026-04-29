@@ -5,8 +5,8 @@ phases:
     commands:
       - echo Logging in to Amazon ECR...
       - aws --version
-      - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
-      - REPOSITORY_URI=508471420037.dkr.ecr.$AWS_us-east-1.amazonaws.com/myapp-repo
+      - $(aws ecr get-login --no-include-email --region $us-east1
+      - REPOSITORY_URI=508471420037.dkr.ecr.us-east-1.amazonaws.com/capstone-ci-cd-app-repo
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
   build:
     commands:
